@@ -1,0 +1,171 @@
+<html>
+<head>
+</head>
+<body>
+
+
+<div id='result'></div>
+
+<h3 id='status'><h3>
+
+<script>
+
+	var Scorer = function() {
+		rule = function(dice, expectedDie) { return false; }
+		scoreLogic = function(dice,expectedDie) { return 0; }
+		expectedDie = 0;
+		
+		singleFinderRule = function(dice, expectedDie) {return countDice(dice, expectedDie) < 3; }
+		tripleFinderRule = function(dice, expectedDie){return countDice(dice, expectedDie) > 3; }
+		singleDiceScorerWhenRollingTriple = function(dice, expectedDie) {return singleDieScoring(expectedDie)*(countDice(dice, expectedDie)-3);}
+		singleDiceScorer = function(dice, expectedDie) {return singleDieScoring(expectedDie)*countDice(dice, expectedDie);}
+		
+	
+		
+	};
+	Scorer.prototype.getTheScore = function(dice, expectedDie) {
+			if (rule(dice, expectedDie)) {
+				return scoreLogic(dice, expectedDie);
+			}
+			return 0;
+		}
+	Scorer.prototype.score = function(dice, expectedDie, condition, scorer) {
+			if (condition(dice, expectedDie)) {
+				return scorer(dice, expectedDie);
+			}
+			return 0;
+		}
+		
+	var TripleScorer = function() {
+		rule = function(dice, expectedDie) { return countDice(dice, expectedDie) >= 3; }
+		scoreLogic = function(dice, expectedDie) { return tripleDieScoring(expectedDie); }
+	};
+		
+	var scoreKeeper = new Scorer();
+	TripleScorer.prototype = scoreKeeper;
+	
+	function roll(dice) {
+	
+			var total = 0;
+			var tripleScoreKeeper = new TripleScorer();
+			for(var i=1; i<=6; i++) {
+				total += tripleScoreKeeper.getTheScore(dice, i);
+			}
+			
+			total += scoreKeeper.score(dice, 1, singleFinderRule, singleDiceScorer);
+								
+			total += scoreKeeper.score(dice, 1, tripleFinderRule, singleDiceScorerWhenRollingTriple);
+			
+			total += scoreKeeper.score(dice, 5, singleFinderRule, singleDiceScorer);
+								
+			total += scoreKeeper.score(dice, 5, tripleFinderRule, singleDiceScorerWhenRollingTriple);
+				
+			return total;
+	}	
+	
+	function scoreSingle(dice, expectedDie) {	
+		var count = countDice(dice, expectedDie);
+		if(count < 3) {
+			return singleDieScoring(expectedDie)*count;
+		}
+		if(count > 3) {
+			return singleDieScoring(expectedDie) * (count-3);
+		}
+		return 0;
+	}
+	
+	// anywhere we see orange, we have a rule - make rules pluggable
+	
+	function singleDieScoring(die) {
+		if (die === 1) {
+			return 100;
+		}			
+		if (die === 5) {
+			return 50;
+		}	
+		
+		return 0;
+	}
+	
+	// this can be eliminated by doing a lookup
+	function tripleDieScoring(die) {
+		if (die === 1) {
+			return 1000;
+		}			
+		return die * 100;
+	}
+	
+	
+	// probably something built into jquery
+	// we didn't test drive because we didn't realize we were solving a new problem
+	function countDice(dice, expectedDie) {
+		var matches = 0;
+		
+		for(var i=0; i<dice.length; i++) {
+			if (dice[i] == expectedDie) {				
+				matches++;
+			}
+		}
+		return matches;
+	}
+	
+	// another rule
+	function scoreFive(matches) {		
+		if (matches < 2) {	
+			return 50;
+		}
+	}
+		
+	var testCount = 0;
+	var testFailed = 0;
+	
+	// fucking awesome test framework
+	function AreEqual(actual, expected, message) {
+		var output = message + ' - expected=' + expected + ' , actual=' + actual ;
+		Assert(expected === actual, output);
+	}
+	
+    function Assert(val, message) {
+		testCount++;
+        if (!val) {
+			testFailed++;
+            writeMessage('result', message);
+        }
+    }
+	
+	function writeMessage(elementId, message) {
+		document.getElementById(elementId).innerText = document.getElementById(elementId).innerText + '\n' + message;
+	}
+
+	
+	AreEqual(scoreKeeper.score([1], 1, 
+			function(dice, expectedDie) { return countDice(dice, expectedDie) < 3 }, 
+			function(dice, expectedDie) { return 5; }), 
+			5, 
+			'1 scores 5 condition');
+	AreEqual(scoreKeeper.score([1], 2, 
+			function(dice, expectedDie) { return countDice(dice, expectedDie) < 3 }, 
+			function(dice, expectedDie) { return 5; }), 
+			5, 
+			'2 scores 5 condition');
+	
+	AreEqual(roll([1,2,3,4,6]), 100, '1x1=100');	
+	AreEqual(roll([1,1,2,3,6]), 200, '2x1=200');
+	AreEqual(roll([2,3,4,5,6]), 50, '5x1=50');
+	AreEqual(roll([1,1,1,2,6]), 1000, '1x3=1000');
+	AreEqual(roll([1,5,2,3,4]), 150, '1x1 + 1x5 = 150');
+	AreEqual(roll([5,5,2,3,4]), 100, '5x2 = 100');
+	AreEqual(roll([5,5,5,3,4]), 500, '5x3 = 500');
+	AreEqual(roll([4,4,4,2,3]), 400, '4x3 = 400');
+	AreEqual(roll([1,1,1,5,1]), 1150, '1x4 + 1x5 = 1150');
+	AreEqual(roll([1,1,1,1,1]), 1200, '1x5 = 1200');
+	AreEqual(roll([2,3,4,6,2]), 0, '1x5 = 1200');
+	AreEqual(roll([3,3,3,5,4]), 350, '3x3 + 5x1 = 350');
+	
+	Assert(countDice([2,2,3,4,5], 2) === 2, 'count 2x2');
+	
+	writeMessage('status', 'Results: ' + (testCount-testFailed) + ' / ' + testCount + ' tests passed');
+</script>
+
+</body>
+</html>

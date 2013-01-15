@@ -20,18 +20,17 @@
 		singleDiceScorerWhenRollingTriple = function(dice, expectedDie) {return singleDieScoring(expectedDie)*(countDice(dice, expectedDie)-3);}
 		singleDiceScorer = function(dice, expectedDie) {return singleDieScoring(expectedDie)*countDice(dice, expectedDie);}
 		
-	
-		
+		this.score = function(dice, expectedDie, condition, scorer) {
+			if (condition(dice, expectedDie)) {
+				return scorer(dice, expectedDie);
+			}
+			return 0;
+		}		
 	};
+	
 	Scorer.prototype.getTheScore = function(dice, expectedDie) {
 			if (rule(dice, expectedDie)) {
 				return scoreLogic(dice, expectedDie);
-			}
-			return 0;
-		}
-	Scorer.prototype.score = function(dice, expectedDie, condition, scorer) {
-			if (condition(dice, expectedDie)) {
-				return scorer(dice, expectedDie);
 			}
 			return 0;
 		}

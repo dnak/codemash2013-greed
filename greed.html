@@ -13,6 +13,8 @@
 	var Scorer = function() {
 		rule = function(dice, expectedDie) { return false; }
 		scoreLogic = function(dice,expectedDie) { return 0; }
+		removeDice = function(dice, expectedDie) { return; }
+		
 		expectedDie = 0;
 		
 		singleFinderRule = function(dice, expectedDie) {return countDice(dice, expectedDie) < 3; }
@@ -30,14 +32,27 @@
 	
 	Scorer.prototype.getTheScore = function(dice, expectedDie) {
 			if (rule(dice, expectedDie)) {
-				return scoreLogic(dice, expectedDie);
+				var total = scoreLogic(dice, expectedDie);
+				removeDice(expectedDie);
+				return total;
 			}
+			
 			return 0;
 		}
 		
-	var TripleScorer = function() {
-		rule = function(dice, expectedDie) { return countDice(dice, expectedDie) >= 3; }
-		scoreLogic = function(dice, expectedDie) { return tripleDieScoring(expectedDie); }
+	var TripleScorer = function(diceRolled) {
+		dice = diceRolled;
+		numberOfRemovedDie = 0;
+		rule = function(expectedDie) { return countDice(dice, expectedDie) >= 3; }
+		scoreLogic = function(expectedDie) { return tripleDieScoring(expectedDie); }
+		removeDice = function(expectedDie) {			
+			for(var i = dice.length-1; i >= 0; i--){
+				if(dice[i] == expectedDie && numberOfRemovedDie <= 3){
+					dice.splice(i,1);
+					numberOfRemovedDie++;
+				}
+			}
+		}		
 	};
 		
 	var scoreKeeper = new Scorer();
@@ -46,9 +61,9 @@
 	function roll(dice) {
 	
 			var total = 0;
-			var tripleScoreKeeper = new TripleScorer();
+			var tripleScoreKeeper = new TripleScorer(dice);
 			for(var i=1; i<=6; i++) {
-				total += tripleScoreKeeper.getTheScore(dice, i);
+				total += tripleScoreKeeper.getTheScore(i);
 			}
 			
 			total += scoreKeeper.score(dice, 1, singleFinderRule, singleDiceScorer);

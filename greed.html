@@ -10,69 +10,82 @@
 
 <script>
 
-	var Scorer = function() {
-		rule = function(dice, expectedDie) { return false; }
-		scoreLogic = function(dice,expectedDie) { return 0; }
+	var Scorer = function(diceRolled) {
+		dice = diceRolled;
+		rule = function(expectedDie) { return false; }
+		scoreLogic = function(expectedDie) { return 0; }
+		removeDice = function( expectedDie) { }
+		
 		expectedDie = 0;
 		
-		singleFinderRule = function(dice, expectedDie) {return countDice(dice, expectedDie) < 3; }
-		tripleFinderRule = function(dice, expectedDie){return countDice(dice, expectedDie) > 3; }
-		singleDiceScorerWhenRollingTriple = function(dice, expectedDie) {return singleDieScoring(expectedDie)*(countDice(dice, expectedDie)-3);}
-		singleDiceScorer = function(dice, expectedDie) {return singleDieScoring(expectedDie)*countDice(dice, expectedDie);}
+		singleFinderRule = function(expectedDie) {return countDice(dice, expectedDie) < 3; }
+		tripleFinderRule = function(expectedDie){return countDice(dice, expectedDie) > 3; }
+		singleDiceScorerWhenRollingTriple = function(expectedDie) {return singleDieScoring(expectedDie)*(countDice(dice, expectedDie)-3);}
+		singleDiceScorer = function(expectedDie) {return singleDieScoring(expectedDie)*countDice(dice, expectedDie);}
 		
-	
-		
-	};
-	Scorer.prototype.getTheScore = function(dice, expectedDie) {
-			if (rule(dice, expectedDie)) {
-				return scoreLogic(dice, expectedDie);
-			}
-			return 0;
-		}
-	Scorer.prototype.score = function(dice, expectedDie, condition, scorer) {
+		this.score = function(expectedDie, condition, scorer) {
 			if (condition(dice, expectedDie)) {
-				return scorer(dice, expectedDie);
+				var total = scorer(dice, expectedDie);
+				removeDice(dice, expectedDie);
+				return total;
 			}
 			return 0;
+		}		
+	};
+	
+	Scorer.prototype.getTheScore = function(expectedDie) {
+		if (rule(expectedDie)) {
+			var total = scoreLogic(expectedDie);
+			removeDice(expectedDie);
+			return total;
+		}
+		
+		return 0;
 		}
 		
 	var TripleScorer = function() {
-		rule = function(dice, expectedDie) { return countDice(dice, expectedDie) >= 3; }
-		scoreLogic = function(dice, expectedDie) { return tripleDieScoring(expectedDie); }
+		numberOfRemovedDie = 0;
+		rule = function(expectedDie) { return countDice(dice, expectedDie) >= 3; }
+		scoreLogic = function(expectedDie) { return tripleDieScoring(expectedDie); }
+		removeDice = function(expectedDie) {			
+			for(var i = dice.length-1; i >= 0; i--){
+				if(dice[i] == expectedDie && numberOfRemovedDie < 3){
+					dice.splice(i,1);
+					numberOfRemovedDie++;
+				}
+			}
+		}		
 	};
 		
-	var scoreKeeper = new Scorer();
-	TripleScorer.prototype = scoreKeeper;
+	var SingleScorer = function() {	
+		rule = function(expectedDie) { return countDice(dice, expectedDie) >= 1; }
+		scoreLogic = function(expectedDie) { return singleDieScoring(expectedDie)*countDice(dice, expectedDie); }
+		removeDice = function(expectedDie) {			
+			for(var i = dice.length-1; i >= 0; i--){
+				if(dice[i] == expectedDie){
+					dice.splice(i,1);
+				}
+			}
+		}		
+	}
 	
 	function roll(dice) {
+			var scoreKeeper = new Scorer(dice);
+			TripleScorer.prototype = scoreKeeper;
+			SingleScorer.prototype = scoreKeeper;
 	
 			var total = 0;
 			var tripleScoreKeeper = new TripleScorer();
 			for(var i=1; i<=6; i++) {
-				total += tripleScoreKeeper.getTheScore(dice, i);
+				total += tripleScoreKeeper.getTheScore(i);
 			}
-			
-			total += scoreKeeper.score(dice, 1, singleFinderRule, singleDiceScorer);
-								
-			total += scoreKeeper.score(dice, 1, tripleFinderRule, singleDiceScorerWhenRollingTriple);
-			
-			total += scoreKeeper.score(dice, 5, singleFinderRule, singleDiceScorer);
-								
-			total += scoreKeeper.score(dice, 5, tripleFinderRule, singleDiceScorerWhenRollingTriple);
-				
+
+			var singleScoreKeeper = new SingleScorer();
+			total += singleScoreKeeper.getTheScore(1);
+			total += singleScoreKeeper.getTheScore(5);
+												
 			return total;
 	}	
-	
-	function scoreSingle(dice, expectedDie) {	
-		var count = countDice(dice, expectedDie);
-		if(count < 3) {
-			return singleDieScoring(expectedDie)*count;
-		}
-		if(count > 3) {
-			return singleDieScoring(expectedDie) * (count-3);
-		}
-		return 0;
-	}
 	
 	// anywhere we see orange, we have a rule - make rules pluggable
 	
@@ -138,12 +151,13 @@
 	}
 
 	
-	AreEqual(scoreKeeper.score([1], 1, 
+	var scoreKeeperTests = new Scorer([1]);
+	AreEqual(scoreKeeperTests.score(1, 
 			function(dice, expectedDie) { return countDice(dice, expectedDie) < 3 }, 
 			function(dice, expectedDie) { return 5; }), 
 			5, 
 			'1 scores 5 condition');
-	AreEqual(scoreKeeper.score([1], 2, 
+	AreEqual(scoreKeeperTests.score(2, 
 			function(dice, expectedDie) { return countDice(dice, expectedDie) < 3 }, 
 			function(dice, expectedDie) { return 5; }), 
 			5, 
@@ -157,7 +171,7 @@
 	AreEqual(roll([5,5,2,3,4]), 100, '5x2 = 100');
 	AreEqual(roll([5,5,5,3,4]), 500, '5x3 = 500');
 	AreEqual(roll([4,4,4,2,3]), 400, '4x3 = 400');
-	AreEqual(roll([1,1,1,5,1]), 1150, '1x4 + 1x5 = 1150');
+	AreEqual(roll([1,1,1,5,1]), 1150, '1x4 + 1x5 = 1150'); 
 	AreEqual(roll([1,1,1,1,1]), 1200, '1x5 = 1200');
 	AreEqual(roll([2,3,4,6,2]), 0, '1x5 = 1200');
 	AreEqual(roll([3,3,3,5,4]), 350, '3x3 + 5x1 = 350');
